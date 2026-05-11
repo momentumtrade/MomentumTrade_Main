@@ -37,6 +37,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (currentUser) {
         try {
+          // Sync with Middleware
+          await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: currentUser.uid, email: currentUser.email }),
+          });
+
           await ensureUser({
             uid: currentUser.uid,
             email: currentUser.email,
@@ -46,6 +53,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (error) {
           console.error("Error ensuring user in MongoDB:", error);
         }
+      } else {
+        // Clear Middleware cookie
+        await fetch('/api/auth/session', { method: 'DELETE' });
       }
 
       setLoading(false);
