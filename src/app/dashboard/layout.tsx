@@ -24,6 +24,7 @@ import {
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
+import { getISTTime } from '@/lib/time';
 
 export default function DashboardLayout({
   children,
@@ -35,22 +36,17 @@ export default function DashboardLayout({
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [istTime, setIstTime] = useState('');
+  const [istDate, setIstDate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const ist = new Intl.DateTimeFormat('en-IN', {
-        timeZone: 'Asia/Kolkata',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }).format(now);
-      setIstTime(ist);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    // Fetch online time on mount
+    getISTTime().then(setIstDate);
+    
+    // Update locally every second
+    const interval = setInterval(() => {
+      setIstDate(prev => prev ? new Date(prev.getTime() + 1000) : null);
+    }, 1000);
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -173,9 +169,22 @@ export default function DashboardLayout({
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="hidden lg:flex items-center gap-3 glass px-4 py-2 rounded-2xl text-zinc-500">
-              <Clock className="w-4 h-4 text-emerald-500" />
-              <span className="text-xs font-black tracking-tighter w-[100px] text-zinc-900 dark:text-zinc-100">{istTime} <span className="text-[10px] text-zinc-500 ml-1">IST</span></span>
+            <div className="hidden lg:flex items-center gap-5 glass px-4 py-2 rounded-2xl">
+              <div className="flex flex-col items-end">
+                <span className="text-[8px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-none mb-1">IST Date</span>
+                <span className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100">
+                  {istDate ? format(istDate, 'do MMMM, yyyy') : 'Loading...'}
+                </span>
+              </div>
+              <div className="w-px h-6 bg-zinc-200 dark:border-zinc-800" />
+              <div className="flex flex-col items-start">
+                <span className="text-[8px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-none mb-1 flex items-center gap-1">
+                  <Clock className="w-2 h-2 text-emerald-500" /> IST Time
+                </span>
+                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {istDate ? format(istDate, 'hh:mm:ss a') : '00:00:00 --'}
+                </span>
+              </div>
             </div>
 
             <Link href="/dashboard/analytics" className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl transition-all group">

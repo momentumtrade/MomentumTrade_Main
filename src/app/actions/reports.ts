@@ -1,85 +1,73 @@
 'use server';
 
-import nodemailer from 'nodemailer';
-import { getTrades } from './trades';
-import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns';
+import { getDb } from '@/lib/mongodb';
+import { sendEmail } from '@/lib/email';
+import { getISTTime } from '@/lib/time';
+import { format } from 'date-fns';
 
-export async function sendPerformanceReport(userId: string, userEmail: string) {
+export async function sendPerformanceReport(userId: string, email: string) {
   try {
-    const trades = await getTrades(userId);
-    const now = new Date();
-    const weekStart = startOfWeek(now);
-    const weekEnd = endOfWeek(now);
+    const db = await getDb();
+    const trades = await db.collection('trades')
+      .find({ userId })
+      .sort({ tradeDate: -1 })
+      .toArray();
 
-    const weekTrades = trades.filter(t => {
-      const date = parseISO(t.tradeDate);
-      return date >= weekStart && date <= weekEnd;
-    });
+    const istNow = await getISTTime();
+    const dateStr = format(istNow, 'PPP p');
 
-    const totalPnl = weekTrades.reduce((acc, t) => acc + (t.profitLossAmount || 0), 0);
-    const wins = weekTrades.filter(t => (t.profitLossAmount || 0) > 0).length;
-    const winRate = weekTrades.length > 0 ? (wins / weekTrades.length) * 100 : 0;
+    // Basic stats calculation
+    const actualTrades = trades.filter(t => t.marketType !== 'No Trade' && t.marketType !== 'Holiday');
+    const totalPnl = trades.reduce((acc, t) => acc + (t.profitLossAmount || 0), 0);
+    const winRate = actualTrades.length > 0 
+      ? (actualTrades.filter(t => (t.profitLossAmount || 0) > 0).length / actualTrades.length) * 100 
+      : 0;
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    });
-
-    const mailOptions = {
-      from: `"MomentumTrade Reports" <${process.env.SMTP_EMAIL}>`,
-      to: userEmail,
-      subject: `Weekly Performance Report - ${format(now, 'MMM d, yyyy')}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #10b981;">MomentumTrade Performance Summary</h2>
-          <p>Hello Trader, here is your performance report for the week of ${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}.</p>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0;">
-            <div style="padding: 15px; background: #f0fdf4; border-radius: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #15803d; font-weight: bold;">TOTAL PNL</p>
-              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: ${totalPnl >= 0 ? '#10b981' : '#ef4444'};">₹${totalPnl.toLocaleString('en-IN')}</p>
-            </div>
-            <div style="padding: 15px; background: #f0f9ff; border-radius: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #0369a1; font-weight: bold;">WIN RATE</p>
-              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #0ea5e9;">${Math.round(winRate)}%</p>
-            </div>
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #10b981;">MomentumTrade - Performance Report</h2>
+        <p style="color: #64748b;">Generated on: ${dateStr} (IST)</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+        
+        <div style="display: grid; grid-template-cols: 1fr 1fr; gap: 20px;">
+          <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">Total P&L</p>
+            <p style="margin: 5px 0 0; font-size: 20px; font-weight: bold; color: ${totalPnl >= 0 ? '#10b981' : '#ef4444'};">₹${totalPnl.toLocaleString('en-IN')}</p>
           </div>
-
-          <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-            <tr style="background: #f8fafc;">
-              <th style="text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0;">Date</th>
-              <th style="text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0;">Asset</th>
-              <th style="text-align: right; padding: 10px; border-bottom: 2px solid #e2e8f0;">PNL</th>
-            </tr>
-            ${weekTrades.map(t => `
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${format(parseISO(t.tradeDate), 'MMM d')}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${t.asset}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right; color: ${(t.profitLossAmount || 0) >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold;">₹${(t.profitLossAmount || 0).toLocaleString('en-IN')}</td>
-              </tr>
-            `).join('')}
-          </table>
-
-          <p style="margin-top: 30px; font-size: 12px; color: #64748b; text-align: center;">
-            This is an automated report from your MomentumTrade Dashboard.
-          </p>
+          <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">Win Rate</p>
+            <p style="margin: 5px 0 0; font-size: 20px; font-weight: bold; color: #3b82f6;">${winRate.toFixed(1)}%</p>
+          </div>
         </div>
-      `,
-    };
 
-    if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-       return { success: false, error: 'SMTP credentials not configured in .env.local' };
-    }
+        <h3 style="margin-top: 30px; color: #1e293b;">Recent Activities</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+          <tr style="background: #f1f5f9;">
+            <th style="padding: 10px; text-align: left; font-size: 12px;">Date</th>
+            <th style="padding: 10px; text-align: left; font-size: 12px;">Asset</th>
+            <th style="padding: 10px; text-align: right; font-size: 12px;">P&L</th>
+          </tr>
+          ${actualTrades.slice(0, 5).map(t => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 10px; font-size: 14px;">${format(new Date(t.tradeDate), 'MMM d')}</td>
+              <td style="padding: 10px; font-size: 14px;">${t.asset}</td>
+              <td style="padding: 10px; font-size: 14px; text-align: right; color: ${(t.profitLossAmount || 0) >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold;">
+                ₹${(t.profitLossAmount || 0).toLocaleString('en-IN')}
+              </td>
+            </tr>
+          `).join('')}
+        </table>
 
-    await transporter.sendMail(mailOptions);
+        <div style="margin-top: 30px; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center;">
+          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="color: #10b981; text-decoration: none; font-weight: bold;">View Full Journal</a>
+        </div>
+      </div>
+    `;
+
+    await sendEmail(email, `Performance Report - ${format(istNow, 'MMM d, yyyy')}`, html);
     return { success: true };
-  } catch (error: any) {
-    console.error('Error sending performance report:', error);
-    return { success: false, error: error.message || 'Failed to send report' };
+  } catch (error) {
+    console.error('Error generating performance report:', error);
+    return { success: false };
   }
 }

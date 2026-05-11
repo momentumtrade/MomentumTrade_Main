@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { AIChatBot } from '@/components/AIChatBot';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
           <AuthProvider>
             <NotificationProvider>
               {children}
+              <AIChatBot />
             </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>

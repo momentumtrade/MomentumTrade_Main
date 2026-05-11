@@ -20,6 +20,24 @@ export interface UserSettings {
     maxDailyLoss: number;
     maxTradesPerDay: number;
   };
+  customFieldDefinitions?: string[];
+  customDropdownOptions?: {
+    markets: string[];
+    strategies: string[];
+    setups: string[];
+    sessions: string[];
+  };
+  defaultValues?: Record<string, string>;
+  reportFrequency?: 'daily' | 'weekly' | 'monthly' | 'custom';
+  customReportSchedule?: {
+    days: string[]; // ['Monday', 'Wednesday', ...]
+    time: string; // '10:00'
+  };
+  riskControlSettings?: {
+    maxDailyLossAmount: number;
+    maxTradesPerDay: number;
+    emailAlertsEnabled: boolean;
+  };
 }
 
 export interface Trade {
@@ -50,6 +68,8 @@ export interface Trade {
   screenshotUrl?: string;
   notes: string;
   status: 'Open' | 'Closed';
+  isLocked?: boolean;
+  customFields?: Record<string, string>;
   createdAt: string;
 }
 
