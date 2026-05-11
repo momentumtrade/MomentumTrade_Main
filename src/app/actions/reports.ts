@@ -66,8 +66,8 @@ export async function sendPerformanceReport(userId: string, email: string) {
 
     await sendEmail(email, `Performance Report - ${format(istNow, 'MMM d, yyyy')}`, html);
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating performance report:', error);
-    return { success: false };
+    return { success: false, error: error.message || 'Failed to generate report' };
   }
 }

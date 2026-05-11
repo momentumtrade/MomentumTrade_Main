@@ -22,7 +22,7 @@ export async function askTradingAI(userId: string, message: string, history: any
       direction: t.tradeDirection,
       date: t.tradeDate,
       quality: t.tradeQualityRating,
-      confidence: t.tradeConfidenceRating,
+      confidence: t.confidenceLevel,
       rr: t.riskRewardRatio
     }));
 

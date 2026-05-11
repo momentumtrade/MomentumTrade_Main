@@ -94,7 +94,7 @@ export default function JournalPage() {
       const matchesMinPnl = !filters.minPnl || pnl >= parseFloat(filters.minPnl);
       const matchesMaxPnl = !filters.maxPnl || pnl <= parseFloat(filters.maxPnl);
       
-      const rating = parseInt(trade.tradeQualityRating || '0');
+      const rating = trade.tradeQualityRating ?? 0;
       const matchesRating = rating >= parseInt(filters.minRating);
       
       let matchesDate = true;
@@ -367,7 +367,7 @@ export default function JournalPage() {
                             <div className="flex flex-col items-center">
                               <div className="flex gap-0.5">
                                 {[...Array(5)].map((_, i) => (
-                                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < (parseInt(trade.tradeQualityRating || '0') / 2) ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
+                                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < ((trade.tradeQualityRating ?? 0) / 2) ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
                                 ))}
                               </div>
                               <span className="text-[9px] font-black text-zinc-400 mt-1">{trade.tradeQualityRating}/10</span>
